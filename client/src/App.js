@@ -10,8 +10,12 @@ import './App.css';
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="App">
+        {/* Test Tailwind CSS */}
+        <div className="bg-blue-500 text-white p-4 mb-4 rounded">
+          Tailwind CSS is working!
+        </div>
         <Header />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
