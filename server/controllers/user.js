@@ -1,11 +1,17 @@
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import inMemoryDB from "../utils/inMemoryDB.js";
 
 export const getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find().select("-password"); // hide passwords in API response
-    return res.status(200).json(users);
-  } catch (err) {
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const users = await User.find().select("-password"); // hide passwords in API response
+      return res.status(200).json(users);
+    } catch (err) {
+      const users = await inMemoryDB.getAllUsers();
+      return res.status(200).json(users);
+    }
+  } else {
     const users = await inMemoryDB.getAllUsers();
     return res.status(200).json(users);
   }
@@ -17,48 +23,87 @@ export const postLogin = async (req, res) => {
     return res.status(400).json({ message: "Username and password required" });
   }
 
-  try {
-    // -----------------
-    // 1. Try MongoDB first
-    // -----------------
-    let user = await User.findOne({ username });
+  if (mongoose.connection.readyState === 1) {
+    try {
+      // -----------------
+      // 1. Try MongoDB first
+      // -----------------
+      let user = await User.findOne({ username });
 
-    if (user) {
-      // ✅ Check plain text password
-      if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      if (user) {
+        // ✅ Check plain text password
+        if (user.password !== password) {
+          return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        // Success login
+        req.session.user = { id: user._id, username: user.username };
+        req.session.voted = req.session.voted || false;
+
+        return res.status(200).json({
+          message: "Login successful",
+          user: { username: user.username },
+          voted: req.session.voted,
+        });
       }
 
-      // Success login
+      // -----------------
+      // 2. If user doesn't exist → create new one
+      // -----------------
+      user = new User({ username, password });
+      await user.save();
+
       req.session.user = { id: user._id, username: user.username };
-      req.session.voted = req.session.voted || false;
+      req.session.voted = false;
 
-      return res.status(200).json({
-        message: "Login successful",
+      return res.status(201).json({
+        message: "New user created & logged in",
         user: { username: user.username },
-        voted: req.session.voted,
+        voted: false,
       });
+    } catch (dbError) {
+      console.error("⚠ MongoDB failed, falling back to in-memory:", dbError);
+
+      // -----------------
+      // 3. Fallback: inMemoryDB
+      // -----------------
+      try {
+        let user = await inMemoryDB.findUser({ username });
+
+        if (!user) {
+          user = await inMemoryDB.createUser({ username, password });
+          req.session.user = { username: user.username };
+          req.session.voted = false;
+          return res.status(201).json({
+            message: "New user created & logged in (in-memory)",
+            user: { username: user.username },
+            voted: false,
+          });
+        }
+
+        // Validate password
+        if (user.password !== password) {
+          return res.status(401).json({ message: "Invalid credentials (in-memory)" });
+        }
+
+        req.session.user = { username: user.username };
+        req.session.voted = req.session.voted || false;
+
+        return res.status(200).json({
+          message: "Login successful (in-memory)",
+          user: { username: user.username },
+          voted: req.session.voted,
+        });
+      } catch (fallbackErr) {
+        return res.status(500).json({
+          message: "Login error (in-memory)",
+          error: fallbackErr.message,
+        });
+      }
     }
-
+  } else {
     // -----------------
-    // 2. If user doesn't exist → create new one
-    // -----------------
-    user = new User({ username, password });
-    await user.save();
-
-    req.session.user = { id: user._id, username: user.username };
-    req.session.voted = false;
-
-    return res.status(201).json({
-      message: "New user created & logged in",
-      user: { username: user.username },
-      voted: false,
-    });
-  } catch (dbError) {
-    console.error("⚠ MongoDB failed, falling back to in-memory:", dbError);
-
-    // -----------------
-    // 3. Fallback: inMemoryDB
+    // Direct fallback: inMemoryDB
     // -----------------
     try {
       let user = await inMemoryDB.findUser({ username });
