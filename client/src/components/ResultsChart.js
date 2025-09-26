@@ -10,14 +10,7 @@ import {
   Legend,
 } from 'chart.js';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 const ResultsChart = ({ results }) => {
   const data = {
@@ -26,9 +19,18 @@ const ResultsChart = ({ results }) => {
       {
         label: 'Votes',
         data: Object.values(results),
-        backgroundColor: ['rgba(255, 99, 132, 0.2)', 'rgba(54, 162, 235, 0.2)', 'rgba(255, 206, 86, 0.2)'],
-        borderColor: ['rgba(255, 99, 132, 1)', 'rgba(54, 162, 235, 1)', 'rgba(255, 206, 86, 1)'],
-        borderWidth: 1,
+        backgroundColor: [
+          'rgba(37, 99, 235, 0.5)',
+          'rgba(16, 185, 129, 0.5)',
+          'rgba(239, 68, 68, 0.5)',
+        ],
+        borderColor: [
+          'rgba(37, 99, 235, 1)',
+          'rgba(16, 185, 129, 1)',
+          'rgba(239, 68, 68, 1)',
+        ],
+        borderWidth: 2,
+        borderRadius: 6,
       },
     ],
   };
@@ -36,17 +38,25 @@ const ResultsChart = ({ results }) => {
   const options = {
     responsive: true,
     plugins: {
-      legend: {
-        position: 'top',
-      },
+      legend: { position: 'bottom', labels: { color: '#fff' } },
       title: {
         display: true,
-        text: 'Voting Results',
+        text: '📊 Voting Results',
+        color: '#374151',
+        font: { size: 18, weight: 'bold' },
       },
+    },
+    scales: {
+      x: { ticks: { color: '#9CA3AF' } },
+      y: { beginAtZero: true, ticks: { color: '#9CA3AF' } },
     },
   };
 
-  return <Bar data={data} options={options} />;
+  return (
+    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg">
+      <Bar data={data} options={options} />
+    </div>
+  );
 };
 
 export default ResultsChart;

@@ -6,22 +6,24 @@ import Header from './components/Header';
 import LoginPage from './pages/LoginPage';
 import VotePage from './pages/VotePage';
 import ResultsPage from './pages/ResultsPage';
-import './App.css';
 
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <div className="App">
-        {/* Test Tailwind CSS */}
-        <div className="bg-blue-500 text-white p-4 mb-4 rounded">
-          Tailwind CSS is working!
-        </div>
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100 flex flex-col">
+        {/* Sticky header */}
         <Header />
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/vote" element={<VotePage />} />
-          <Route path="/results" element={<ResultsPage />} />
-        </Routes>
+        
+        {/* Content */}
+        <main className="flex-1 container mx-auto px-4 py-8">
+          <Routes>
+            <Route path="/" element={<LoginPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/vote" element={<VotePage />} />
+            <Route path="/results" element={<ResultsPage />} />
+          </Routes>
+        </main>
+
         <ToastContainer />
       </div>
     </Router>

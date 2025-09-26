@@ -7,8 +7,8 @@ import http from 'http';
 import { Server as IOServer } from 'socket.io';
 import session from 'express-session';
 
-import { getAllUsers , postLogin , postSignup, getMe } from './controllers/user.js';
-import {postVote, getVotes, getResults, setIo } from './controllers/vote.js';
+import { getAllUsers , postLogin , getMe } from './controllers/user.js';
+import {postVote, getResults, setIo } from './controllers/vote.js';
 
 
 const app = express();
@@ -56,7 +56,7 @@ const sess = session({
 });
 
 // Enable CORS for frontend with credentials. Allow common localhost dev ports and optional FRONTEND_URL.
-const allowedOrigins = [process.env.FRONTEND_URL, 'http://localhost:3000', 'http://localhost:5173'].filter(Boolean);
+const allowedOrigins = [process.env.FRONTEND_URL, 'http://localhost:5000'].filter(Boolean);
 app.use(cors({
   origin: (origin, callback) => {
     // allow requests with no origin like mobile apps or curl
@@ -74,7 +74,7 @@ app.use(sess);
 // Socket.IO
 const io = new IOServer(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5000',
     methods: ['GET', 'POST'],
     credentials: true,
   }
@@ -92,7 +92,6 @@ io.on('connection', (socket) => {
 
 // API routes
 app.get('/api/users', getAllUsers);
-app.post('/api/signup', postSignup);
 app.post('/api/login', postLogin);
 app.get('/api/me', getMe);
 app.post('/api/vote', postVote);

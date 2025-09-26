@@ -9,6 +9,14 @@ export const createUser = async ({ username, password }) => {
   return user;
 };
 
+export const updateUserPassword = async (username, newPassword) => {
+  const user = users.get(username);
+  if (!user) throw new Error('User not found');
+  user.password = newPassword;
+  users.set(username, user);
+  return user;
+};
+
 export const findUser = async (query) => {
   if (query.username) return users.get(query.username) || null;
   return null;
