@@ -30,7 +30,7 @@ const ResultsChart = ({ results }) => {
           'rgba(239, 68, 68, 1)',
         ],
         borderWidth: 2,
-        borderRadius: 6,
+        borderRadius: 5,
       },
     ],
   };

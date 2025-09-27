@@ -25,18 +25,12 @@ export const postLogin = async (req, res) => {
 
   if (mongoose.connection.readyState === 1) {
     try {
-      // -----------------
-      // 1. Try MongoDB first
-      // -----------------
       let user = await User.findOne({ username });
 
       if (user) {
-        // ✅ Check plain text password
         if (user.password !== password) {
           return res.status(401).json({ message: "Invalid credentials" });
         }
-
-        // Success login
         req.session.user = { id: user._id, username: user.username };
         req.session.voted = req.session.voted || false;
 
@@ -46,10 +40,6 @@ export const postLogin = async (req, res) => {
           voted: req.session.voted,
         });
       }
-
-      // -----------------
-      // 2. If user doesn't exist → create new one
-      // -----------------
       user = new User({ username, password });
       await user.save();
 
@@ -83,7 +73,9 @@ export const postLogin = async (req, res) => {
 
         // Validate password
         if (user.password !== password) {
-          return res.status(401).json({ message: "Invalid credentials (in-memory)" });
+          return res
+            .status(401)
+            .json({ message: "Invalid credentials (in-memory)" });
         }
 
         req.session.user = { username: user.username };
@@ -121,7 +113,9 @@ export const postLogin = async (req, res) => {
 
       // Validate password
       if (user.password !== password) {
-        return res.status(401).json({ message: "Invalid credentials (in-memory)" });
+        return res
+          .status(401)
+          .json({ message: "Invalid credentials (in-memory)" });
       }
 
       req.session.user = { username: user.username };
@@ -147,6 +141,8 @@ export const getMe = async (req, res) => {
     const voted = !!req.session.voted;
     res.status(200).json({ user, voted, option: req.session.option || null });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching session", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching session", error: error.message });
   }
 };

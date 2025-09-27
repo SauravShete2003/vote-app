@@ -1,6 +1,5 @@
-// Simple in-memory datastore used when MongoDB is unavailable (dev fallback).
-const users = new Map(); // username -> { username, password }
-const votes = new Map(); // sessionId -> { sessionId, option, createdAt }
+const users = new Map(); 
+const votes = new Map();
 
 export const createUser = async ({ username, password }) => {
   if (users.has(username)) throw new Error('User already exists');

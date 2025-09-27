@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import Vote from "../models/Vote.js";
+import User from "../models/User.js";  // Import User model
 import inMemoryDB from "../utils/inMemoryDB.js";
 
 let io = null;
@@ -7,20 +7,17 @@ const setIo = (ioInstance) => {
   io = ioInstance;
 };
 
-// Helper to compute totals, prefers Mongo then falls back to memory
+// Compute totals from Mongo OR fallback
 const computeTotals = async () => {
-  if (mongoose.connection.readyState === 1 && Vote && Vote.aggregate) {
+  if (mongoose.connection.readyState === 1) {
     try {
-      const agg = await Vote.aggregate([
-        { $group: { _id: "$option", count: { $sum: 1 } } },
-      ]);
+      const users = await User.find({ voted: true });
       const totals = { "Option A": 0, "Option B": 0, "Option C": 0 };
-      agg.forEach((row) => {
-        totals[row._id] = row.count;
+      users.forEach((u) => {
+        if (u.voteOption) totals[u.voteOption] += 1;
       });
       return totals;
     } catch (err) {
-      // fall through to in-memory
       return inMemoryDB.computeTotals();
     }
   } else {
@@ -28,70 +25,76 @@ const computeTotals = async () => {
   }
 };
 
+// ✅ Vote endpoint per-user
 const postVote = async (req, res) => {
   try {
-    const voterSessionId = req.sessionID;
     const { option } = req.body;
+    const userSession = req.session.user;
 
-    if (mongoose.connection.readyState === 1) {
-      try {
-        if (Vote && Vote.findOne) {
-          const existingVote = await Vote.findOne({ sessionId: voterSessionId });
-          if (existingVote) {
-            return res.status(400).json({ message: "❌ You have already voted! Each person can only vote once." });
-          }
-          const newVote = new Vote({ sessionId: voterSessionId, option });
-          await newVote.save();
-          req.session.voted = true;
-          req.session.option = option;
-          const currentResults = await computeTotals();
-          if (io) io.emit("voteUpdate", { results: currentResults, lastUpdated: new Date() });
-          return res.status(201).json({ message: "✅ Vote recorded successfully!", vote: newVote, currentResults });
-        }
-      } catch (err) {
-        // if mongo errors, fall back to in-memory
-        const existing = await inMemoryDB.findVoteBySessionId(voterSessionId);
-        if (existing) {
-          return res.status(400).json({ message: "❌ You have already voted! Each person can only vote once." });
-        }
-        const newVote = await inMemoryDB.saveVote({ sessionId: voterSessionId, option });
-        req.session.voted = true;
-        req.session.option = option;
-        const currentResults = await inMemoryDB.computeTotals();
-        if (io) io.emit("voteUpdate", { results: currentResults, lastUpdated: new Date() });
-        return res.status(201).json({ message: "✅ Vote recorded successfully! (in-memory)", vote: newVote, currentResults });
-      }
-    } else {
-      // Direct in-memory fallback
-      const existing = await inMemoryDB.findVoteBySessionId(voterSessionId);
-      if (existing) {
-        return res.status(400).json({ message: "❌ You have already voted! Each person can only vote once." });
-      }
-      const newVote = await inMemoryDB.saveVote({ sessionId: voterSessionId, option });
-      req.session.voted = true;
-      req.session.option = option;
-      const currentResults = await inMemoryDB.computeTotals();
-      if (io) io.emit("voteUpdate", { results: currentResults, lastUpdated: new Date() });
-      return res.status(201).json({ message: "✅ Vote recorded successfully! (in-memory)", vote: newVote, currentResults });
+    if (!userSession || !userSession.username) {
+      return res.status(401).json({ message: "⚠️ You must be logged in to vote!" });
     }
+
+    // If Mongo is connected
+    if (mongoose.connection.readyState === 1) {
+      let user = await User.findOne({ username: userSession.username });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check if already voted
+      if (user.voted) {
+        return res.status(400).json({ message: "❌ You have already voted!" });
+      }
+
+      // Record vote for this user
+      user.voted = true;
+      user.voteOption = option;
+      await user.save();
+
+      const currentResults = await computeTotals();
+      if (io) io.emit("voteUpdate", { results: currentResults, lastUpdated: new Date() });
+
+      return res.status(201).json({
+        message: "✅ Vote recorded successfully!",
+        user: { username: user.username, option },
+        currentResults,
+      });
+    }
+
+    // ---- In-memory fallback if Mongo isn't running
+    let user = await inMemoryDB.findUser({ username: userSession.username });
+    if (!user) {
+      return res.status(404).json({ message: "User not found (in-memory)" });
+    }
+
+    if (user.voted) {
+      return res.status(400).json({ message: "❌ You have already voted!" });
+    }
+
+    user.voted = true;
+    user.voteOption = option;
+    await inMemoryDB.updateUser(user);
+
+    const currentResults = await inMemoryDB.computeTotals();
+    if (io) io.emit("voteUpdate", { results: currentResults, lastUpdated: new Date() });
+
+    return res.status(201).json({
+      message: "✅ Vote recorded successfully! (in-memory)",
+      user: { username: user.username, option },
+      currentResults,
+    });
   } catch (error) {
-    res.status(500).json({ message: "⚠️ Sorry, there was a problem recording your vote", error: error.message });
+    res.status(500).json({ message: "⚠️ Problem recording your vote", error: error.message });
   }
 };
 
+// Get Votes (debug/admin use)
 const getVotes = async (req, res) => {
   try {
     if (mongoose.connection.readyState === 1) {
-      try {
-        if (Vote && Vote.find) {
-          const votes = await Vote.find();
-          return res.status(200).json(votes);
-        }
-      } catch (err) {
-        // fall back
-        const votes = await inMemoryDB.getVotes();
-        return res.status(200).json(votes);
-      }
+      const users = await User.find({ voted: true });
+      return res.status(200).json(users.map(u => ({ username: u.username, voteOption: u.voteOption })));
     } else {
       const votes = await inMemoryDB.getVotes();
       return res.status(200).json(votes);
@@ -101,6 +104,7 @@ const getVotes = async (req, res) => {
   }
 };
 
+// Results API
 const getResults = async (req, res) => {
   try {
     const totals = await computeTotals();

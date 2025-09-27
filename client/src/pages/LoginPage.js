@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import { login } from "../services/api"; // 👈 your backend login API
+import { login } from "../services/api";
 
 const LoginPage = () => {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -21,13 +21,22 @@ const LoginPage = () => {
 
     setLoading(true);
     try {
-      // 👇 Calls your /login endpoint (which auto-creates new user if not exist)
       const res = await login(form.username, form.password);
 
-      // show success toast depending on status
-      toast.success(res.message || "Logged in!");
+      if (res.user) {
+        localStorage.setItem("user", JSON.stringify(res.user));
+        localStorage.setItem("isLoggedIn", "true");
+      } else {
+        // fallback: store just username, to avoid "undefined" bug
+        localStorage.setItem(
+          "user",
+          JSON.stringify({ username: form.username })
+        );
+        localStorage.setItem("isLoggedIn", "true");
+      }
 
-      // redirect to vote page
+      window.dispatchEvent(new Event("storage"));
+      toast.success(res.message || "Logged in!");
       navigate("/vote");
     } catch (error) {
       toast.error(error.response?.data?.message || "Login failed");
@@ -42,10 +51,12 @@ const LoginPage = () => {
         <h1 className="text-2xl font-bold text-center text-blue-600 dark:text-blue-400">
           🗳 Vote App
         </h1>
-        
+
         <p className="text-center text-sm text-gray-500 dark:text-gray-400">
           Enter your username and password. <br />
-          <span className="text-blue-600 dark:text-blue-400 font-medium">New here?</span> 
+          <span className="text-blue-600 dark:text-blue-400 font-medium">
+            New here?
+          </span>{" "}
           Don’t worry — we’ll auto-create your account.
         </p>
 
